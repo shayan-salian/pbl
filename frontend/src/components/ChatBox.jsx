@@ -1,170 +1,233 @@
-import { useState, useEffect, useRef } from "react"
-import io from "socket.io-client"
-import { getMessages, sendMessage } from "../lib/api"
+import { useState, useEffect, useRef } from "react";
+import io from "socket.io-client";
+import { motion } from "framer-motion";
+import { getMessages, sendMessage } from "../lib/api";
+
+const messageVariants = {
+  hidden: { opacity: 0, y: 6 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.18 } },
+};
 
 export default function ChatBox({ requestId, user }) {
-  const [messages, setMessages] = useState([])
-  const [newMessage, setNewMessage] = useState("")
-  const [socket, setSocket] = useState(null)
-  const [connected, setConnected] = useState(false)
-  const messagesEndRef = useRef(null)
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [socket, setSocket] = useState(null);
+  const [connected, setConnected] = useState(false);
+  const [typingUser, setTypingUser] = useState(null);
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    loadMessages()
-    connectSocket()
+    loadMessages();
+    connectSocket();
 
     return () => {
       if (socket) {
-        socket.disconnect()
+        socket.disconnect();
       }
-    }
-  }, [requestId])
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestId]);
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+    scrollToBottom();
+  }, [messages]);
 
   const loadMessages = async () => {
     try {
-      const data = await getMessages(requestId)
-      setMessages(data.items || [])
+      const data = await getMessages(requestId);
+      setMessages(data.items || []);
     } catch (err) {
-      console.error("Failed to load messages:", err)
+      console.error("Failed to load messages:", err);
     }
-  }
+  };
 
   const connectSocket = () => {
-    // Get token from cookie
     const token = document.cookie
       .split("; ")
-      .find(row => row.startsWith("token="))
-      ?.split("=")[1]
+      .find((row) => row.startsWith("token="))
+      ?.split("=")[1];
 
-    if (!token) return
+    if (!token) return;
 
     const newSocket = io(`${process.env.NEXT_PUBLIC_API_BASE}/chat`, {
-      auth: { token }
-    })
+      auth: { token },
+    });
 
     newSocket.on("connect", () => {
-      console.log("Connected to chat")
-      setConnected(true)
-      newSocket.emit("join", { requestId })
-    })
+      setConnected(true);
+      newSocket.emit("join", { requestId });
+    });
 
     newSocket.on("message:new", (message) => {
-      setMessages(prev => [...prev, message])
-    })
+      setMessages((prev) => [...prev, message]);
+    });
+
+    newSocket.on("typing:user", ({ userId }) => {
+      if (userId !== user?._id) {
+        setTypingUser(userId);
+      }
+    });
+
+    newSocket.on("typing:stop", ({ userId }) => {
+      if (userId === typingUser) {
+        setTypingUser(null);
+      }
+    });
 
     newSocket.on("error", (error) => {
-      console.error("Socket error:", error)
-    })
+      console.error("Socket error:", error);
+    });
 
     newSocket.on("disconnect", () => {
-      console.log("Disconnected from chat")
-      setConnected(false)
-    })
+      setConnected(false);
+    });
 
-    setSocket(newSocket)
-  }
+    setSocket(newSocket);
+  };
 
   const handleSend = async (e) => {
-    e.preventDefault()
-    
-    if (!newMessage.trim()) return
+    e.preventDefault();
+    if (!newMessage.trim()) return;
 
-    const messageText = newMessage.trim()
-    setNewMessage("")
+    const messageText = newMessage.trim();
+    setNewMessage("");
 
     try {
       if (socket && connected) {
-        // Send via socket for real-time
         socket.emit("message:send", {
           requestId,
-          text: messageText
-        })
+          text: messageText,
+        });
       } else {
-        // Fallback to REST API
-        await sendMessage(requestId, messageText)
-        await loadMessages()
+        await sendMessage(requestId, messageText);
+        await loadMessages();
       }
     } catch (err) {
-      console.error("Failed to send message:", err)
-      alert("Failed to send message")
+      console.error("Failed to send message:", err);
+      alert("Failed to send message");
     }
-  }
+  };
+
+  const handleTyping = (value) => {
+    setNewMessage(value);
+    if (!socket || !connected) return;
+    socket.emit("typing:start", { requestId });
+    // small delay to send stop event
+    setTimeout(() => {
+      socket.emit("typing:stop", { requestId });
+    }, 800);
+  };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
   return (
-    <div className="card flex flex-col h-[600px]">
-      <div className="flex justify-between items-center mb-4 pb-4 border-b">
-        <h2 className="text-xl font-semibold">Chat</h2>
+    <div className="card flex h-[520px] flex-col md:h-[600px]">
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-3">
+        <div className="flex flex-col gap-0.5">
+          <h2 className="text-sm font-semibold text-slate-100">
+            Chat room
+          </h2>
+          <p className="text-[11px] text-slate-400">
+            Coordinate details, share explanations, and close the session.
+          </p>
+        </div>
         <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500' : 'bg-gray-400'}`} />
-          <span className="text-sm text-gray-600">
-            {connected ? 'Connected' : 'Disconnected'}
+          <span
+            className={`h-2 w-2 rounded-full ${
+              connected ? "bg-emerald-400" : "bg-slate-500"
+            }`}
+          />
+          <span className="text-[11px] text-slate-400">
+            {connected ? "Connected" : "Offline"}
           </span>
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+      <div className="flex-1 space-y-2 overflow-y-auto pr-1">
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 py-8">
-            No messages yet. Start the conversation!
+          <div className="flex h-full items-center justify-center text-xs text-slate-400">
+            No messages yet. Say hi and break the ice!
           </div>
         ) : (
           messages.map((msg) => {
-            const isOwn = msg.senderId?._id === user?._id || msg.senderId === user?._id
-            
+            const isOwn =
+              msg.senderId?._id === user?._id ||
+              msg.senderId === user?._id;
+            const name =
+              typeof msg.senderId === "object"
+                ? msg.senderId?.name || "User"
+                : isOwn
+                ? "You"
+                : "Peer";
+
             return (
-              <div
+              <motion.div
                 key={msg._id}
-                className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                variants={messageVariants}
+                initial="hidden"
+                animate="visible"
+                className={`flex ${isOwn ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                  className={`max-w-[80%] rounded-2xl px-3 py-2 text-xs ${
                     isOwn
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                      ? "bg-primary-500 text-white"
+                      : "bg-slate-800 text-slate-50 border border-slate-700/70"
                   }`}
                 >
-                  <div className="text-xs opacity-75 mb-1">
-                    {msg.senderId?.name || 'Unknown'}
+                  <div className="mb-0.5 text-[10px] font-medium opacity-75">
+                    {name}
                   </div>
-                  <div className="break-words">{msg.text}</div>
-                  <div className="text-xs opacity-75 mt-1">
-                    {new Date(msg.createdAt).toLocaleTimeString()}
+                  <div className="whitespace-pre-wrap break-words">
+                    {msg.text}
+                  </div>
+                  <div className="mt-0.5 text-[9px] opacity-70">
+                    {msg.createdAt
+                      ? new Date(msg.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : ""}
                   </div>
                 </div>
-              </div>
-            )
+              </motion.div>
+            );
           })
+        )}
+        {typingUser && (
+          <div className="flex justify-start">
+            <div className="rounded-full bg-slate-800/70 px-3 py-1 text-[10px] text-slate-300">
+              Typing…
+            </div>
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSend} className="flex gap-2">
-        <input
-          type="text"
+      <form
+        onSubmit={handleSend}
+        className="mt-3 flex items-end gap-2 border-t border-slate-800 pt-3"
+      >
+        <textarea
+          rows={1}
           value={newMessage}
-          onChange={(e) => setNewMessage(e.target.value)}
-          placeholder="Type a message..."
-          className="input-field flex-1"
-          maxLength={2000}
+          onChange={(e) => handleTyping(e.target.value)}
+          placeholder="Type a message…"
+          className="input-field min-h-[40px] max-h-[80px] resize-none text-xs"
         />
         <button
           type="submit"
           disabled={!newMessage.trim()}
-          className="btn-primary disabled:opacity-50"
+          className="btn-primary text-xs px-3 py-2 disabled:opacity-60"
         >
           Send
         </button>
       </form>
     </div>
-  )
+  );
 }

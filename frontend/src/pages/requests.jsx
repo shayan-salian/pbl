@@ -1,139 +1,164 @@
-import { useState, useEffect } from "react"
-import { useRouter } from "next/router"
-import Navbar from "../components/Navbar"
-import RequestBoard from "../components/RequestBoard"
-import { createRequest, getCurrentUser } from "../lib/api"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Navbar from "../components/Navbar";
+import RequestBoard from "../components/RequestBoard";
+import { createRequest, getCurrentUser } from "../lib/api";
+import { motion } from "framer-motion";
 
 export default function Requests() {
-  const router = useRouter()
-  const [user, setUser] = useState(null)
-  const [showForm, setShowForm] = useState(false)
+  const router = useRouter();
+  const [user, setUser] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     subject: "",
     topic: "",
     description: "",
     availability: "",
-    budget: ""
-  })
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
+    budget: "",
+  });
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    loadUser()
-  }, [])
+    loadUser();
+  }, []);
 
   const loadUser = async () => {
     try {
-      const userData = await getCurrentUser()
-      setUser(userData)
-    } catch (err) {
-      router.push("/login")
+      const userData = await getCurrentUser();
+      setUser(userData);
+    } catch {
+      router.push("/login");
     }
-  }
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError("")
-    setLoading(true)
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
     try {
       await createRequest({
         ...formData,
-        budget: parseFloat(formData.budget) || 0
-      })
-      
+        budget: parseFloat(formData.budget) || 0,
+      });
+
       setFormData({
         subject: "",
         topic: "",
         description: "",
         availability: "",
-        budget: ""
-      })
-      setShowForm(false)
-      setRefreshKey(prev => prev + 1) // Trigger refresh
+        budget: "",
+      });
+      setShowForm(false);
+      setRefreshKey((prev) => prev + 1);
     } catch (err) {
-      setError(err.message || "Failed to create request")
+      setError(err.message || "Failed to create request");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    })
-  }
+    setFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
 
-  const canCreateRequest = user?.roles?.includes("student")
+  const canCreateRequest = user?.roles?.includes("student");
 
   return (
-    <div className="min-h-screen">
+    <>
       <Navbar user={user} />
-      
-      <main className="max-w-6xl mx-auto px-6 py-8">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold">Help Requests</h1>
-          
+
+      <div className="space-y-6">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight text-slate-50">
+              Help requests
+            </h1>
+            <p className="text-sm text-slate-400 max-w-xl">
+              Post what you need help with or browse open requests to accept as
+              a tutor.
+            </p>
+          </div>
+
           {canCreateRequest && (
             <button
-              onClick={() => setShowForm(!showForm)}
+              onClick={() => setShowForm((prev) => !prev)}
               className="btn-primary"
             >
-              {showForm ? "Cancel" : "+ New Request"}
+              {showForm ? "Close form" : "New request"}
             </button>
           )}
-        </div>
+        </header>
 
-        {showForm && (
-          <div className="card mb-6">
-            <h2 className="text-xl font-semibold mb-4">Create New Request</h2>
-            
+        {showForm && canCreateRequest && (
+          <motion.div
+            initial={{ opacity: 0, y: -8, scale: 0.99 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -8, scale: 0.98 }}
+            className="card"
+          >
+            <h2 className="text-lg font-semibold text-slate-100 mb-1.5">
+              Create a new help request
+            </h2>
+            <p className="text-xs text-slate-400 mb-4">
+              Be specific so the right tutor can understand your need quickly.
+            </p>
+
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+              <div className="mb-3 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-xs text-rose-100">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-4 md:grid-cols-2">
                 <div>
-                  <label htmlFor="subject" className="block text-sm font-medium mb-1">
+                  <label
+                    htmlFor="subject"
+                    className="block text-xs font-medium text-slate-300 mb-1"
+                  >
                     Subject *
                   </label>
                   <input
-                    type="text"
                     id="subject"
                     name="subject"
                     value={formData.subject}
                     onChange={handleChange}
                     required
                     className="input-field"
-                    placeholder="e.g., Mathematics"
+                    placeholder="Eg. Mathematics, Physics"
                   />
                 </div>
-
                 <div>
-                  <label htmlFor="topic" className="block text-sm font-medium mb-1">
+                  <label
+                    htmlFor="topic"
+                    className="block text-xs font-medium text-slate-300 mb-1"
+                  >
                     Topic *
                   </label>
                   <input
-                    type="text"
                     id="topic"
                     name="topic"
                     value={formData.topic}
                     onChange={handleChange}
                     required
                     className="input-field"
-                    placeholder="e.g., Calculus"
+                    placeholder="Eg. Calculus - Derivatives"
                   />
                 </div>
               </div>
 
               <div>
-                <label htmlFor="description" className="block text-sm font-medium mb-1">
-                  Description
+                <label
+                  htmlFor="description"
+                  className="block text-xs font-medium text-slate-300 mb-1"
+                >
+                  Brief description
                 </label>
                 <textarea
                   id="description"
@@ -141,58 +166,64 @@ export default function Requests() {
                   value={formData.description}
                   onChange={handleChange}
                   rows={3}
-                  className="input-field"
-                  placeholder="Describe what you need help with..."
+                  className="input-field resize-none"
+                  placeholder="Explain what you’re stuck on or what outcome you want."
                 />
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid gap-4 md:grid-cols-[2fr_1fr]">
                 <div>
-                  <label htmlFor="availability" className="block text-sm font-medium mb-1">
+                  <label
+                    htmlFor="availability"
+                    className="block text-xs font-medium text-slate-300 mb-1"
+                  >
                     Availability
                   </label>
                   <input
-                    type="text"
                     id="availability"
                     name="availability"
                     value={formData.availability}
                     onChange={handleChange}
                     className="input-field"
-                    placeholder="e.g., Weekday evenings"
+                    placeholder="Eg. Weekdays after 7 PM, Saturday mornings"
                   />
                 </div>
-
                 <div>
-                  <label htmlFor="budget" className="block text-sm font-medium mb-1">
+                  <label
+                    htmlFor="budget"
+                    className="block text-xs font-medium text-slate-300 mb-1"
+                  >
                     Budget (₹)
                   </label>
                   <input
-                    type="number"
                     id="budget"
                     name="budget"
+                    type="number"
+                    min="0"
+                    step="50"
                     value={formData.budget}
                     onChange={handleChange}
-                    min="0"
-                    step="10"
                     className="input-field"
-                    placeholder="500"
+                    placeholder="Eg. 500"
                   />
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="btn-primary disabled:opacity-50"
-              >
-                {loading ? "Creating..." : "Create Request"}
-              </button>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="btn-primary"
+                >
+                  {loading ? "Creating..." : "Create request"}
+                </button>
+              </div>
             </form>
-          </div>
+          </motion.div>
         )}
 
         <RequestBoard key={refreshKey} user={user} />
-      </main>
-    </div>
-  )
+      </div>
+    </>
+  );
 }

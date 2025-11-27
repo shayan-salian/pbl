@@ -1,99 +1,127 @@
-import { useState, useEffect } from "react"
-import { useRouter } from "next/router"
-import { getRequests, acceptRequest } from "../lib/api"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import { motion } from "framer-motion";
+import { getRequests, acceptRequest } from "../lib/api";
+
+const listVariants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.06, delayChildren: 0.05 },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } },
+};
 
 export default function RequestBoard({ user }) {
-  const router = useRouter()
-  const [requests, setRequests] = useState([])
-  const [filters, setFilters] = useState({
-    subject: "",
-    status: ""
-  })
-  const [loading, setLoading] = useState(true)
-  const [actionLoading, setActionLoading] = useState(null)
+  const router = useRouter();
+  const [requests, setRequests] = useState([]);
+  const [filters, setFilters] = useState({ subject: "", status: "" });
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
-    loadRequests()
-  }, [filters])
+    loadRequests();
+  }, [filters.subject, filters.status]);
 
   const loadRequests = async () => {
+    setLoading(true);
     try {
-      const data = await getRequests(filters)
-      setRequests(data.items || [])
+      const data = await getRequests(filters);
+      setRequests(data.items || []);
     } catch (err) {
-      console.error("Failed to load requests:", err)
+      console.error("Failed to load requests:", err);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleAccept = async (requestId) => {
     if (!user?.roles?.includes("tutor")) {
-      alert("Only tutors can accept requests")
-      return
+      alert("Only tutors can accept requests");
+      return;
     }
 
-    setActionLoading(requestId)
+    setActionLoading(requestId);
     try {
-      const result = await acceptRequest(requestId)
+      const result = await acceptRequest(requestId);
       if (result.chatRoomId) {
-        router.push(`/chat/${requestId}`)
+        router.push(`/chat/${requestId}`);
       } else {
-        loadRequests()
+        loadRequests();
       }
     } catch (err) {
-      alert(err.message || "Failed to accept request")
+      alert(err.message || "Failed to accept request");
     } finally {
-      setActionLoading(null)
+      setActionLoading(null);
     }
-  }
+  };
 
   const handleViewChat = (requestId) => {
-    router.push(`/chat/${requestId}`)
-  }
+    router.push(`/chat/${requestId}`);
+  };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      open: "bg-green-100 text-green-800",
-      accepted: "bg-blue-100 text-blue-800",
-      "in-progress": "bg-yellow-100 text-yellow-800",
-      completed: "bg-gray-100 text-gray-800",
-      cancelled: "bg-red-100 text-red-800"
+  const getStatusClass = (status) => {
+    switch (status) {
+      case "open":
+        return "status-pill-open";
+      case "accepted":
+      case "in-progress":
+        return "status-pill-accepted";
+      case "completed":
+        return "status-pill-completed";
+      case "cancelled":
+        return "status-pill-cancelled";
+      default:
+        return "pill";
     }
-    return colors[status] || "bg-gray-100 text-gray-800"
-  }
+  };
 
   if (loading) {
-    return <div className="text-center py-8 text-gray-500">Loading requests...</div>
+    return (
+      <div className="card flex items-center justify-center text-sm text-slate-400">
+        Loading requests…
+      </div>
+    );
   }
 
   return (
-    <div>
+    <div className="space-y-4">
       {/* Filters */}
-      <div className="card mb-6">
-        <div className="grid md:grid-cols-3 gap-4">
+      <div className="card">
+        <div className="grid gap-3 md:grid-cols-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Subject</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              Subject
+            </label>
             <input
               type="text"
               value={filters.subject}
-              onChange={(e) => setFilters({ ...filters, subject: e.target.value })}
-              placeholder="Search by subject..."
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, subject: e.target.value }))
+              }
+              placeholder="Eg. Mathematics"
               className="input-field"
             />
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium mb-1">Status</label>
+            <label className="block text-xs font-medium text-slate-300 mb-1">
+              Status
+            </label>
             <select
               value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
+              onChange={(e) =>
+                setFilters((prev) => ({ ...prev, status: e.target.value }))
+              }
               className="input-field"
             >
               <option value="">All</option>
               <option value="open">Open</option>
               <option value="accepted">Accepted</option>
-              <option value="in-progress">In Progress</option>
+              <option value="in-progress">In progress</option>
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
@@ -101,78 +129,92 @@ export default function RequestBoard({ user }) {
         </div>
       </div>
 
-      {/* Request List */}
+      {/* Requests */}
       {requests.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          No requests found
+        <div className="card text-center text-sm text-slate-400">
+          No requests found. Try changing filters or create a new request.
         </div>
       ) : (
-        <div className="space-y-4">
+        <motion.div
+          variants={listVariants}
+          initial="hidden"
+          animate="visible"
+          className="grid gap-4 md:grid-cols-2"
+        >
           {requests.map((request) => {
-            const isOwner = user?._id === request.studentId?._id
-            const isTutor = user?._id === request.tutorId?._id
-            const canAccept = user?.roles?.includes("tutor") && 
-                             request.status === "open" && 
-                             !isOwner
-            const canViewChat = (isOwner || isTutor) && request.status !== "open"
+            const isOwner = user?._id === request.studentId?._id;
+            const isTutor = user?._id === request.tutorId?._id;
+            const canAccept =
+              user?.roles?.includes("tutor") &&
+              request.status === "open" &&
+              !isOwner;
+            const canViewChat =
+              (isOwner || isTutor) && request.status !== "open";
 
             return (
-              <div key={request._id} className="card hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold mb-1">
-                      {request.subject} - {request.topic}
+              <motion.div
+                key={request._id}
+                variants={cardVariants}
+                className="card flex flex-col gap-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-100">
+                      {request.subject} • {request.topic}
                     </h3>
-                    <p className="text-gray-600 text-sm mb-2">
-                      Posted by {request.studentId?.name}
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      Posted by {request.studentId?.name || "Unknown"}
                     </p>
-                    {request.description && (
-                      <p className="text-gray-700 mb-2">{request.description}</p>
-                    )}
                   </div>
-                  
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(request.status)}`}>
+                  <span className={`${getStatusClass(request.status)} text-[10px]`}>
                     {request.status}
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-3">
+                {request.description && (
+                  <p className="text-xs text-slate-300">
+                    {request.description}
+                  </p>
+                )}
+
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
                   {request.availability && (
-                    <div>📅 {request.availability}</div>
+                    <span>📅 {request.availability}</span>
                   )}
                   {request.budget > 0 && (
-                    <div>💰 ₹{request.budget}</div>
+                    <span>💰 ₹{request.budget}</span>
                   )}
                   {request.tutorId && (
-                    <div>👨‍🏫 Tutor: {request.tutorId.name}</div>
+                    <span>👨‍🏫 Tutor: {request.tutorId.name}</span>
                   )}
                 </div>
 
-                <div className="flex gap-3">
+                <div className="mt-2 flex gap-2">
                   {canAccept && (
                     <button
                       onClick={() => handleAccept(request._id)}
                       disabled={actionLoading === request._id}
-                      className="btn-primary disabled:opacity-50"
+                      className="btn-primary text-xs"
                     >
-                      {actionLoading === request._id ? "Accepting..." : "Accept Request"}
+                      {actionLoading === request._id
+                        ? "Accepting..."
+                        : "Accept request"}
                     </button>
                   )}
-                  
                   {canViewChat && (
                     <button
                       onClick={() => handleViewChat(request._id)}
-                      className="btn-secondary"
+                      className="btn-secondary text-xs"
                     >
-                      Open Chat
+                      Open chat
                     </button>
                   )}
                 </div>
-              </div>
-            )
+              </motion.div>
+            );
           })}
-        </div>
+        </motion.div>
       )}
     </div>
-  )
+  );
 }
