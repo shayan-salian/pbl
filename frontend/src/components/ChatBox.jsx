@@ -15,10 +15,15 @@ export default function ChatBox({ requestId, user }) {
   const [connected, setConnected] = useState(false);
   const [typingUser, setTypingUser] = useState(null);
   const messagesEndRef = useRef(null);
+  const hasConnectedRef = useRef(false); // prevent multiple socket connections
 
   useEffect(() => {
     loadMessages();
-    connectSocket();
+
+    if (!hasConnectedRef.current) {
+      connectSocket();
+      hasConnectedRef.current = true;
+    }
 
     return () => {
       if (socket) {
@@ -47,6 +52,9 @@ export default function ChatBox({ requestId, user }) {
       .find((row) => row.startsWith("token="))
       ?.split("=")[1];
 
+    console.log("[ChatBox] cookie:", document.cookie);
+    console.log("[ChatBox] token:", token);
+
     if (!token) return;
 
     const newSocket = io(`${process.env.NEXT_PUBLIC_API_BASE}/chat`, {
@@ -54,11 +62,26 @@ export default function ChatBox({ requestId, user }) {
     });
 
     newSocket.on("connect", () => {
+      console.log("[ChatBox] socket connected");
       setConnected(true);
       newSocket.emit("join", { requestId });
     });
 
+    newSocket.on("connect_error", (err) => {
+      console.error("[ChatBox] connect_error:", err.message);
+    });
+
+    newSocket.on("error", (error) => {
+      console.error("[ChatBox] server error event:", error);
+    });
+
+    newSocket.on("disconnect", (reason) => {
+      console.log("[ChatBox] socket disconnected:", reason);
+      setConnected(false);
+    });
+
     newSocket.on("message:new", (message) => {
+      console.log("[ChatBox] message:new", message._id);
       setMessages((prev) => [...prev, message]);
     });
 
@@ -72,14 +95,6 @@ export default function ChatBox({ requestId, user }) {
       if (userId === typingUser) {
         setTypingUser(null);
       }
-    });
-
-    newSocket.on("error", (error) => {
-      console.error("Socket error:", error);
-    });
-
-    newSocket.on("disconnect", () => {
-      setConnected(false);
     });
 
     setSocket(newSocket);
@@ -127,9 +142,7 @@ export default function ChatBox({ requestId, user }) {
       {/* Header */}
       <div className="mb-3 flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-sm font-semibold text-slate-100">
-            Chat room
-          </h2>
+          <h2 className="text-sm font-semibold text-slate-100">Chat room</h2>
           <p className="text-[11px] text-slate-400">
             Coordinate details, share explanations, and close the session.
           </p>
@@ -155,8 +168,7 @@ export default function ChatBox({ requestId, user }) {
         ) : (
           messages.map((msg) => {
             const isOwn =
-              msg.senderId?._id === user?._id ||
-              msg.senderId === user?._id;
+              msg.senderId?._id === user?._id || msg.senderId === user?._id;
             const name =
               typeof msg.senderId === "object"
                 ? msg.senderId?.name || "User"
@@ -231,3 +243,4 @@ export default function ChatBox({ requestId, user }) {
     </div>
   );
 }
+
