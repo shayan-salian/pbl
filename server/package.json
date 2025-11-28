@@ -10,7 +10,11 @@
     "seed": "node seed/seed.js",
     "test": "NODE_ENV=test jest --runInBand --detectOpenHandles"
   },
-  "keywords": ["tutoring", "marketplace", "education"],
+  "keywords": [
+    "tutoring",
+    "marketplace",
+    "education"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
@@ -20,9 +24,14 @@
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-validator": "^7.0.1",
+    "gridfs-stream": "^1.1.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.4.0",
-    "socket.io": "^4.7.5"
+    "mongodb": "^5.9.1",
+    "mongoose": "^8.20.1",
+    "multer": "^1.4.4",
+    "multer-gridfs-storage": "^5.0.2",
+    "socket.io": "^4.7.5",
+    "twilio": "^5.10.6"
   },
   "devDependencies": {
     "jest": "^29.7.0",
