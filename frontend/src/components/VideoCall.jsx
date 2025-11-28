@@ -29,21 +29,20 @@ export default function VideoCall({ requestId, user }) {
   const remoteVideoRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
-  const hasVideoSocketRef = useRef(false);
-
+  const hasVideoSocketRef = useRef(false); // guard socket connect
 
   useEffect(() => {
     if (!hasVideoSocketRef.current) {
-    connectSocket();
-    hasVideoSocketRef.current = true;
-  }
-
-  return () => {
-    cleanupCall();
-    if (socket) {
-      socket.disconnect();
+      connectSocket();
+      hasVideoSocketRef.current = true;
     }
-  };
+
+    return () => {
+      cleanupCall();
+      if (socket) {
+        socket.disconnect();
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestId]);
 
@@ -79,7 +78,7 @@ export default function VideoCall({ requestId, user }) {
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         newSocket.emit("webrtc:answer", { requestId, answer });
-        // don't force CONNECTED here; wait for remote track
+        // do NOT set CONNECTED here; wait for remote track
       } catch (err) {
         console.error("Error handling offer:", err);
         setError("Failed to answer call");
@@ -94,7 +93,7 @@ export default function VideoCall({ requestId, user }) {
         const pc = peerConnectionRef.current;
         if (!pc) return;
         await pc.setRemoteDescription(new RTCSessionDescription(answer));
-        // don't force CONNECTED here; wait for remote track
+        // do NOT set CONNECTED here; wait for remote track
       } catch (err) {
         console.error("Error handling answer:", err);
         setError("Failed to establish call");
