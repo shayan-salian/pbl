@@ -6,6 +6,8 @@ import requestRoutes from "./routes/requests.js";
 import chatRoutes from "./routes/chat.js";
 import reviewRoutes from "./routes/reviews.js";
 import userRoutes from "./routes/users.js";
+import notesRouter from './routes/notes.js';
+
 
 const app = express();
 
@@ -17,6 +19,7 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+app.use('/api/notes', notesRouter);
 
 // Health check
 app.get("/", (req, res) => {
